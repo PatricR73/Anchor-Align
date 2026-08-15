@@ -104,3 +104,12 @@ def test_token_similarity_phonetic_overlap_contributes():
     without_keys = token_similarity(_tok("frayed"), _tok("frade"))
     with_keys = token_similarity(a, b)
     assert with_keys > without_keys
+
+
+def test_token_similarity_identical_words_are_not_phonetically_inflated():
+    # Phonetic similarity supplements edit distance; an already-identical
+    # pair scores EDIT_WEIGHT and must not be bumped to 1.0 — that uniform
+    # +0.4 perturbation on exact pairs flips traceback ties between
+    # equal-cost paths (see token_similarity's docstring).
+    a = _tok("at", keys=("AT",))
+    assert token_similarity(a, a) == 0.6

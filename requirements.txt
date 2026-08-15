@@ -3,6 +3,7 @@
 pydantic>=2.7
 numpy>=1.26
 rapidfuzz>=3.9
+metaphone>=0.6
 num2words>=0.5.13
 faster-whisper>=1.0
 diskcache>=5.6

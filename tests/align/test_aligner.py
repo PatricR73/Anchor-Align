@@ -95,6 +95,35 @@ def test_speaker_carried_over_from_matched_stt_word():
     assert result[0].speaker == "SPEAKER_1"
 
 
+def test_phonetic_match_is_reachable_end_to_end():
+    """A substitution too distant for edit distance alone but sharing a
+    Double Metaphone key must align as MatchType.PHONETIC when the encoder
+    is enabled — the path that was unreachable while the aligner hardcoded
+    NullEncoder."""
+    from anchor_align.normalize.normalizer import DoubleMetaphoneEncoder
+
+    gold = _stt(["the", "frayed", "rope", "swung"])
+    edited = _edited(["the", "frade", "rope", "swung"])
+    result = align(gold, edited, phonetic_encoder=DoubleMetaphoneEncoder())
+
+    frade = next(w for w in result if w.token.text == "frade")
+    assert frade.match_type == MatchType.PHONETIC
+    assert frade.confidence == 0.7
+    assert frade.start == gold[1].start
+
+
+def test_phonetic_matching_is_off_by_default():
+    """The default aligner must not accept a phonetic-only match — opt-in
+    by measurement (see align's docstring), so the default behavior is the
+    published one."""
+    gold = _stt(["the", "frayed", "rope", "swung"])
+    edited = _edited(["the", "frade", "rope", "swung"])
+    result = align(gold, edited)
+
+    frade = next(w for w in result if w.token.text == "frade")
+    assert frade.match_type == MatchType.INTERPOLATED
+
+
 # --------------------------------------------------------------------------
 # The risk-reducing tests: 1:N multi-token collapse-back through S3
 # --------------------------------------------------------------------------

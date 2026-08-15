@@ -12,6 +12,12 @@ dependencies = [
     "pydantic>=2.7",
     "numpy>=1.26",
     "rapidfuzz>=3.9",
+    # doublemetaphone() provides the (primary, alternate) key pair
+    # NormalizedToken.keys needs; jellyfish exposes only single-key
+    # metaphone(). Double Metaphone is English-tuned and unvalidated on
+    # Romanian text — the PhoneticEncoder protocol exists so a phonemic
+    # encoder can be benchmarked against it.
+    "metaphone>=0.6",
     "num2words>=0.5.13",
     "faster-whisper>=1.0",
     "diskcache>=5.6",
@@ -28,7 +34,6 @@ whisperx = ["whisperx"]
 elevenlabs = ["elevenlabs"]
 dev = [
     "pytest>=8.2",
-    "pytest-benchmark>=4.0",
     "ruff>=0.5",
     "mypy>=1.10",
     "hypothesis>=6.100",
@@ -44,6 +49,19 @@ packages = ["src/anchor_align"]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+# E501: long transcript fixtures are intentional; line length stays a
+# formatter/editor concern, not a gate. B905: zip() truncation is
+# deliberate in places (e.g. padding a short word row with columns in the
+# demo), so silent truncation is not treated as a bug here.
+ignore = ["E501", "B905"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Field(...) is the idiomatic pydantic default-argument form, not a
+# function-call-in-default bug.
+extend-immutable-calls = ["pydantic.Field"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
@@ -52,7 +70,7 @@ strict = true
 # Third-party packages with no type stubs / py.typed marker, or optional
 # extras not installed in CI (whisperx, elevenlabs). Scoped to exactly
 # these so a real typing regression anywhere in our code still fails.
-module = ["faster_whisper", "diskcache", "whisperx", "elevenlabs.client", "num2words", "pysbd"]
+module = ["faster_whisper", "diskcache", "whisperx", "elevenlabs.client", "num2words", "pysbd", "metaphone"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

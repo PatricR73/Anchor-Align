@@ -1,10 +1,10 @@
-"""S2 step 5 — phonetic encoders. NullEncoder is the default/no-op strategy
-so the pipeline runs end-to-end before DoubleMetaphoneEncoder or
-RomanianPhonemicEncoder exist."""
+"""S2 step 5 — phonetic encoders. NullEncoder disables phonetic matching;
+DoubleMetaphoneEncoder provides English-tuned (primary, alternate) keys."""
 
 from __future__ import annotations
 
 from anchor_align.normalize.normalizer import (
+    DoubleMetaphoneEncoder,
     NullEncoder,
     apply_phonetic_encoder,
     assert_span_invariant,
@@ -19,6 +19,30 @@ def test_null_encoder_returns_zero_keys():
     encoder = NullEncoder()
     assert encoder.encode("hello") == ()
     assert encoder.encode("") == ()
+
+
+def test_double_metaphone_encoder_returns_keys():
+    encoder = DoubleMetaphoneEncoder()
+    assert encoder.encode("hello") == ("HL",)
+    assert encoder.encode("frayed") == ("FRT",)
+
+
+def test_double_metaphone_encoder_empty_token_has_no_keys():
+    assert DoubleMetaphoneEncoder().encode("") == ()
+    # pure digits have no phonetic content — "no key", not a mismatch
+    assert DoubleMetaphoneEncoder().encode("2024") == ()
+
+
+def test_double_metaphone_encoder_alternate_keys_preserved():
+    encoder = DoubleMetaphoneEncoder()
+    keys = encoder.encode("the")
+    assert len(keys) == 2  # primary + alternate differ
+
+
+def test_homophones_share_a_key():
+    a = DoubleMetaphoneEncoder().encode("frayed")
+    b = DoubleMetaphoneEncoder().encode("frade")
+    assert set(a) & set(b)
 
 
 def test_apply_phonetic_encoder_populates_keys():

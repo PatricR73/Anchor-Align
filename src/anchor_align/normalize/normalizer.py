@@ -29,8 +29,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import cache
+from typing import cast
 
 import num2words
+from metaphone import doublemetaphone
 
 from anchor_align.contractions import CONTRACTIONS
 from anchor_align.interfaces import PhoneticEncoder
@@ -176,11 +179,35 @@ def casefold_and_ascii_fold(tokens: list[NormalizedToken], *, ascii_fold: bool =
 
 class NullEncoder:
     """No phonetic matching — every token gets zero keys. Implements
-    `PhoneticEncoder`; the default strategy, so the pipeline runs
-    end-to-end and phonetic matching is opt-in."""
+    `PhoneticEncoder`; the opt-out strategy for content where phonetic
+    matching would add noise rather than recall."""
 
     def encode(self, token: str) -> tuple[str, ...]:
         return ()
+
+
+@cache
+def _double_metaphone(token: str) -> tuple[str, str]:
+    # metaphone has no type stubs; the package contract is a 2-tuple.
+    return cast(tuple[str, str], doublemetaphone(token))
+
+
+class DoubleMetaphoneEncoder:
+    """English/Germanic-tuned phonetic keys via the `metaphone` package
+    (Double Metaphone, primary + alternate key). Implements
+    `PhoneticEncoder`.
+
+    Runs on the ASCII-folded `normal` form, so Romanian diacritics are gone
+    before encoding. Unvalidated on Romanian text — Double Metaphone's
+    English/Germanic tuning may be wrong for it; a phonemic encoder can be
+    benchmarked against this one via the `PhoneticEncoder` protocol.
+    """
+
+    def encode(self, token: str) -> tuple[str, ...]:
+        if not token:
+            return ()
+        primary, alternate = _double_metaphone(token)
+        return tuple(dict.fromkeys(key for key in (primary, alternate) if key))
 
 
 def apply_phonetic_encoder(tokens: list[NormalizedToken], encoder: PhoneticEncoder) -> list[NormalizedToken]:

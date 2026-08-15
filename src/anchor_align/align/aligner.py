@@ -13,6 +13,7 @@ from itertools import pairwise
 from anchor_align.align.anchors import find_displaced_blocks
 from anchor_align.align.interpolate import interpolate_gaps
 from anchor_align.align.needleman_wunsch import align_segment
+from anchor_align.interfaces import PhoneticEncoder
 from anchor_align.models import (
     AlignedWord,
     EditedToken,
@@ -33,6 +34,15 @@ from anchor_align.normalize.normalizer import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Module-level singleton so the default-argument evaluation happens once.
+# NullEncoder by default: DoubleMetaphoneEncoder is implemented, reachable
+# and tested, but benchmarked as a regression on the synthetic corpus —
+# short common words collide on phonetic keys (and/end -> ANT) inside the
+# force-aligned spans of unrecovered reorders, creating confident long-
+# distance mismatches. Opt in for real transcripts where homophone edits
+# (ASR mishearings) are common: align(..., phonetic_encoder=DoubleMetaphoneEncoder()).
+_DEFAULT_PHONETIC_ENCODER = NullEncoder()
 
 _CONFIDENCE_BY_MATCH_TYPE = {
     MatchType.ANCHOR: 1.0,
@@ -61,16 +71,20 @@ def _seed_normalized_tokens(texts: list[str]) -> list[NormalizedToken]:
     return tokens
 
 
-def normalize_for_alignment(texts: list[str]) -> list[NormalizedToken]:
+def normalize_for_alignment(
+    texts: list[str], *, phonetic_encoder: PhoneticEncoder = _DEFAULT_PHONETIC_ENCODER
+) -> list[NormalizedToken]:
     """Run S2's steps 2-7 (fold/punct/case/phonetic/contractions/numerals)
     over an already-tokenized word stream, skipping the whitespace
-    tokenizer (see `_seed_normalized_tokens`). `NullEncoder` is the
-    phonetic step's default; a real PhoneticEncoder can be swapped in."""
+    tokenizer (see `_seed_normalized_tokens`). The phonetic step defaults
+    to `NullEncoder`; pass `DoubleMetaphoneEncoder()` to enable phonetic
+    matching (see `align`'s docstring for why it is opt-in).
+    """
     tokens = _seed_normalized_tokens(texts)
     tokens = fold_unicode(tokens)
     tokens = extract_trailing_punct(tokens)
     tokens = casefold_and_ascii_fold(tokens)
-    tokens = apply_phonetic_encoder(tokens, NullEncoder())
+    tokens = apply_phonetic_encoder(tokens, phonetic_encoder)
     tokens = expand_contractions(tokens)
     tokens = expand_numerals(tokens)
     return tokens
@@ -282,7 +296,12 @@ def _dp_segment(
     return resolved[len(left) : len(resolved) - len(right)]
 
 
-def align(stt_words: list[STTWord], edited_tokens: list[EditedToken]) -> list[AlignedWord]:
+def align(
+    stt_words: list[STTWord],
+    edited_tokens: list[EditedToken],
+    *,
+    phonetic_encoder: PhoneticEncoder = _DEFAULT_PHONETIC_ENCODER,
+) -> list[AlignedWord]:
     """Align an edited transcript to STT word timing. One `AlignedWord` per
     `edited_tokens` entry, in the same order, always — including entries
     with no real evidence (`match_type=INTERPOLATED`, timing filled in by
@@ -299,6 +318,12 @@ def align(stt_words: list[STTWord], edited_tokens: list[EditedToken]) -> list[Al
     next.stt) range assumption breaks exactly at those crossings, so those
     edited tokens are left to interpolation instead of a bound that would
     silently re-claim another chain's STT content.
+
+    `phonetic_encoder` selects the phonetic-key strategy for the S2 step.
+    Defaults to `NullEncoder`; pass `DoubleMetaphoneEncoder()` to let
+    phonetic key overlap contribute to substitution scoring (useful for
+    real transcripts with homophone mishearings, and measured as a
+    regression on the synthetic corpus — see BENCHMARKS.md).
 
     Interpolation happens IN AUDIO ORDER, not edited order: each compatible
     segment's own INTERPOLATED placeholders are resolved inside
@@ -318,8 +343,8 @@ def align(stt_words: list[STTWord], edited_tokens: list[EditedToken]) -> list[Al
     if not edited_tokens:
         return []
 
-    stt_norm = normalize_for_alignment([w.text for w in stt_words])
-    edited_norm = normalize_for_alignment([t.text for t in edited_tokens])
+    stt_norm = normalize_for_alignment([w.text for w in stt_words], phonetic_encoder=phonetic_encoder)
+    edited_norm = normalize_for_alignment([t.text for t in edited_tokens], phonetic_encoder=phonetic_encoder)
     backbone, displaced_blocks = find_displaced_blocks(stt_norm, edited_norm)
 
     # Merge backbone + every displaced block into one edited-order chain,

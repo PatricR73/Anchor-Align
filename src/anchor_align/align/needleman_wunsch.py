@@ -42,11 +42,22 @@ def token_similarity(a: NormalizedToken, b: NormalizedToken) -> float:
     """1.0 = as identical as this scoring can express, 0.0 = totally
     different. The best pairing across every reading on both sides, blended
     with phonetic key overlap (any of one side's `keys` matching any of the
-    other's; an empty `keys` tuple contributes 0, not a false match)."""
+    other's; an empty `keys` tuple contributes 0, not a false match).
+
+    The phonetic term is gated on `edit_sim < 1.0`: phonetic similarity
+    supplements edit distance, it must not inflate already-perfect matches.
+    Letting identical words score 1.0 instead of EDIT_WEIGHT perturbs every
+    exact pair in a DP matrix by +PHONETIC_WEIGHT, which flips the
+    traceback's choice between genuinely-tied paths (observed: a
+    sentence-final "." matched the far of two identical occurrences at a
+    displaced-block boundary, a 14s error).
+    """
     edit_sim = max(
         Levenshtein.normalized_similarity(x, y) for x in _readings(a) for y in _readings(b)
     )
-    phonetic_sim = 1.0 if (a.keys and b.keys and set(a.keys) & set(b.keys)) else 0.0
+    phonetic_sim = 0.0
+    if edit_sim < 1.0 and a.keys and b.keys and set(a.keys) & set(b.keys):
+        phonetic_sim = 1.0
     return EDIT_WEIGHT * edit_sim + PHONETIC_WEIGHT * phonetic_sim
 
 

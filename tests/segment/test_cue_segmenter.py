@@ -200,7 +200,7 @@ def test_fast_speech_with_room_to_pad_stays_under_cps():
     assert len(cues) > 1
     max_cps = 21.0
     over_budget = [
-        c for c in cues if (c.end - c.start) > 0 and sum(len(l) for l in c.lines) / (c.end - c.start) > max_cps
+        c for c in cues if (c.end - c.start) > 0 and sum(len(line) for line in c.lines) / (c.end - c.start) > max_cps
     ]
     assert over_budget == []
 

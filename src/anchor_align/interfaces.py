@@ -44,9 +44,20 @@ class PhoneticEncoder(Protocol):
 
 
 class Aligner(Protocol):
-    """Implemented by S3: the alignment engine's public entry point."""
+    """Implemented by S3: the alignment engine's public entry point.
 
-    def align(self, stt_words: list[STTWord], edited_tokens: list[EditedToken]) -> list[AlignedWord]: ...
+    `phonetic_encoder` defaults to `NullEncoder`; pass
+    `DoubleMetaphoneEncoder()` to enable phonetic matching (opt-in by
+    measurement — see the implementation's docstring).
+    """
+
+    def align(
+        self,
+        stt_words: list[STTWord],
+        edited_tokens: list[EditedToken],
+        *,
+        phonetic_encoder: PhoneticEncoder,
+    ) -> list[AlignedWord]: ...
 
 
 class CueBuilder(Protocol):
