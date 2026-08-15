@@ -19,9 +19,9 @@ The European Accessibility Act has been enforceable since June 2025 and creates 
 | Mean abs boundary error, level 0.3 | 155.9 ms | 162.3 ms |
 | Worst-case boundary error on documents containing a reorder, level 0.5 | 6708 ms | 20540 ms |
 
-The benchmark corpus is synthetic and there is no validation on real transcripts yet; see BENCHMARKS.md for the full caveats.
+![Drift: body vs tail error, untouched tokens only](benchmarks/results/drift_not_touched.png)
 
-![Demo](docs/demo.gif)
+The benchmark corpus is synthetic and there is no validation on real transcripts yet; see BENCHMARKS.md for the full caveats.
 
 ## The problem this solves
 
