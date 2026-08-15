@@ -1,25 +1,33 @@
 # anchor-align
 
-Takes a transcript that an editor cleaned up and the word timings from speech-to-text, and figures out where each edited word actually falls in the audio. Then it turns that into VTT cues.
+[![CI](https://github.com/PatricR73/Anchor-Align/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PatricR73/Anchor-Align/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
+Takes a transcript that an editor cleaned up and the word timings from speech-to-text, and produces VTT caption cues.
+
+Built for localization vendors, podcast networks, e-learning teams and broadcasters who publish human-edited transcripts and need compliant captions generated from them.
+
+The European Accessibility Act has been enforceable since June 2025 and creates a captioning obligation for media and e-learning sold into the EU.
+
+## Results at a glance
+
+| Measurement | anchor-align | difflib baseline |
+|---|---|---|
+| Tail mean abs boundary error, level 0.3, untouched tokens | 4.0 ms | 370.9 ms |
+| Tail mean abs boundary error, level 0.1, untouched tokens | 4.2 ms | 22.1 ms |
+| Mean abs boundary error, level 0.3 | 155.9 ms | 162.3 ms |
+| Worst-case boundary error on documents containing a reorder, level 0.5 | 6708 ms | 20540 ms |
+
+The benchmark corpus is synthetic and there is no validation on real transcripts yet; see BENCHMARKS.md for the full caveats.
+
+![Demo](docs/demo.gif)
 
 ## The problem this solves
 
 Speech-to-text gives you timestamps for every word that was said. Then a human editor fixes the transcript: drops the "um"s, corrects the names, moves a sentence to a better place. The edited text reads properly now, but it no longer matches the STT output word for word, and the STT output is the only thing carrying timing. So you have a good transcript with no timing, and a timed transcript nobody wants to caption.
 
 This project bridges that. It recovers, for every word in the edited transcript, the timestamp it should have, and it's designed to survive both small text changes and whole sentences being moved around. The cues it produces obey the usual caption constraints (two lines max, 42 characters per line, one to seven seconds, 21 characters per second) and never overlap.
-
-## Does it actually work?
-
-Short version:
-
-- On a long recording (40+ minutes), the naive approach's timing error at the end of the file is about three times what it is near the start. Error accumulates. anchor-align's stays flat, because it periodically re-anchors against words it's confident about.
-- When the editor moved a paragraph around, worst-case timing error went from about 20 seconds down to about 7 seconds, compared to the naive baseline. And when a moved block is recovered properly, the timing inside it is exact.
-
-![Drift: body vs tail error, untouched tokens only](benchmarks/results/drift_not_touched.png)
-
-![Mean boundary error vs corruption level](benchmarks/results/mean_error_vs_level.png)
-
-Both claims come with caveats, and they're spelled out in BENCHMARKS.md. The headline caveat: the benchmark corpus is synthetic. I corrupt clean transcripts with edits I chose, then measure against that. There's no validation against real edited transcripts yet, and that's the biggest open item. Read the caveats before quoting numbers.
 
 ## Install
 
@@ -46,6 +54,8 @@ anchor-align --batch episodes/ --out captions/
 Batch mode pairs each audio file with a same-named .txt or .docx, processes every pair, and writes qc_summary.csv with the per-file counts at the end.
 
 Output is captions.vtt, captions.srt and captions.confidence.json per file. The confidence JSON gives per-cue mean and min confidence, so you can spot weak stretches without opening the video.
+
+The bundled sample in [examples/](examples/) shows what this produces for the shipped `data/sample/` pair: `sample_output.vtt`, `sample_output.srt` and `sample_output.confidence.json`, with the exact command and a walk-through of one cue in [examples/README.md](examples/README.md).
 
 Flags worth knowing:
 

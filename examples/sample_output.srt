@@ -1,0 +1,29 @@
+1
+00:00:00,000 --> 00:00:06,240
+Hi, my name is Joanna and I work on
+a transcript alignment project. Last
+
+2
+00:00:06,240 --> 00:00:11,060
+week I talked with Stephen about
+the data pipeline and a few bugs. "I
+
+3
+00:00:11,060 --> 00:00:16,220
+think the fix is simple," he said,
+"but we should double check it." Twenty
+
+4
+00:00:16,220 --> 00:00:22,340
+percent of the requests failed
+silently, um, before we fixed it. The
+
+5
+00:00:22,340 --> 00:00:28,680
+F.B.I. released a report — nobody
+expected that, honestly. Don't
+
+6
+00:00:28,680 --> 00:00:33,380
+worry, it's not as bad as it
+sounds; we'll fix it by Friday.
