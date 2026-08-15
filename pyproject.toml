@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anchor-align"
+version = "0.1.0"
+description = "Aligns a human-edited transcript to word-level timing from raw STT output, then segments it into caption cues."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "numpy>=1.26",
+    "rapidfuzz>=3.9",
+    "num2words>=0.5.13",
+    "faster-whisper>=1.0",
+    "diskcache>=5.6",
+    "python-docx>=1.1",
+    "pysbd>=0.3.4",
+    "webvtt-py>=0.4.6",
+    "polars>=1.0",
+    "matplotlib>=3.9",
+    "streamlit>=1.36",
+]
+
+[project.optional-dependencies]
+whisperx = ["whisperx"]
+elevenlabs = ["elevenlabs"]
+dev = [
+    "pytest>=8.2",
+    "pytest-benchmark>=4.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "hypothesis>=6.100",
+]
+
+[project.scripts]
+anchor-align = "anchor_align.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anchor_align"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[[tool.mypy.overrides]]
+# Third-party packages with no type stubs / py.typed marker, or optional
+# extras not installed in CI (whisperx, elevenlabs). Scoped to exactly
+# these so a real typing regression anywhere in our code still fails.
+module = ["faster_whisper", "diskcache", "whisperx", "elevenlabs.client", "num2words", "pysbd"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"

@@ -1,0 +1,14 @@
+# Fallback for pip-only installs; source of truth is pyproject.toml.
+# Optional extras: pip install -e ".[whisperx]" / ".[elevenlabs]" / ".[dev]"
+pydantic>=2.7
+numpy>=1.26
+rapidfuzz>=3.9
+num2words>=0.5.13
+faster-whisper>=1.0
+diskcache>=5.6
+python-docx>=1.1
+pysbd>=0.3.4
+webvtt-py>=0.4.6
+polars>=1.0
+matplotlib>=3.9
+streamlit>=1.36

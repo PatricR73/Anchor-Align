@@ -1,0 +1,6 @@
+Hi, my name is Joanna and I work on a transcript alignment project.
+Last week I talked with Stephen about the data pipeline and a few bugs.
+"I think the fix is simple," he said, "but we should double check it."
+Twenty percent of the requests failed silently, um, before we fixed it.
+The F.B.I. released a report — nobody expected that, honestly.
+Don't worry, it's not as bad as it sounds; we'll fix it by Friday.
