@@ -13,8 +13,9 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/**/*.docx
 benchmarks/results/*
 !benchmarks/results/.gitkeep
+!benchmarks/results/*.png
 *.wav
 *.mp4
-*.docx

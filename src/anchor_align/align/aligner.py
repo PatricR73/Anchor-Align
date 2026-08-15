@@ -300,7 +300,7 @@ def align(
     stt_words: list[STTWord],
     edited_tokens: list[EditedToken],
     *,
-    phonetic_encoder: PhoneticEncoder = _DEFAULT_PHONETIC_ENCODER,
+    phonetic_encoder: PhoneticEncoder | None = None,
 ) -> list[AlignedWord]:
     """Align an edited transcript to STT word timing. One `AlignedWord` per
     `edited_tokens` entry, in the same order, always — including entries
@@ -343,8 +343,9 @@ def align(
     if not edited_tokens:
         return []
 
-    stt_norm = normalize_for_alignment([w.text for w in stt_words], phonetic_encoder=phonetic_encoder)
-    edited_norm = normalize_for_alignment([t.text for t in edited_tokens], phonetic_encoder=phonetic_encoder)
+    encoder = phonetic_encoder if phonetic_encoder is not None else _DEFAULT_PHONETIC_ENCODER
+    stt_norm = normalize_for_alignment([w.text for w in stt_words], phonetic_encoder=encoder)
+    edited_norm = normalize_for_alignment([t.text for t in edited_tokens], phonetic_encoder=encoder)
     backbone, displaced_blocks = find_displaced_blocks(stt_norm, edited_norm)
 
     # Merge backbone + every displaced block into one edited-order chain,

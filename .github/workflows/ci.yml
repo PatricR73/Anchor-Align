@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uv sync --all-extras --dev
+      - run: uv sync --frozen --all-extras --dev
       - run: uv run ruff check .
       - run: uv run mypy src/anchor_align
       - run: uv run pytest
