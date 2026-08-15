@@ -81,6 +81,8 @@ result.audio_order   # words in true audio order; the exporters want this list
 result.issues        # every QC finding from all stages
 ```
 
+There's a web app for the same workflow (React + FastAPI, replaces the Streamlit demo) — upload audio and the edited transcript, then inspect the alignment: a confidence heatmap you can click to seek, the cue list, QC findings, and downloads. See [web/README.md](web/README.md).
+
 There's a Streamlit demo for looking at the output visually:
 
 ```bash

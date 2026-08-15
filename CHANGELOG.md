@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Web app (React + FastAPI, under web/) replacing the Streamlit demo: upload audio and an edited transcript, run the full pipeline, and inspect the result — a confidence heatmap over the transcript with click-to-seek, a word-timeline scrubber with a live playhead, the cue list, the QC findings, and VTT/SRT/confidence-JSON downloads. The bundled sample runs with one click; FastAPI serves the built front end in production.
+
 ## [0.1.0] - 2026-08-15
 
 ### Added
