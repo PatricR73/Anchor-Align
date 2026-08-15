@@ -94,6 +94,17 @@ docker compose up demo
 docker compose run --rm cli --batch /input --out /output
 ```
 
+## Operating cost
+
+Measured in this session on the bundled sample (33.864 s of audio, 77 edited words), on a 13th Gen Intel Core i5-13400F (16 threads) with 32 GB RAM, Linux, running faster-whisper on CPU with int8 (the CLI defaults).
+
+| Model size | Audio duration | Wall clock (2 runs) | Ratio (min audio / min compute) | Peak RSS |
+|---|---|---|---|---|
+| base | 33.864 s | 3.36 s / 3.68 s | 10.1 / 9.2 | 457 MiB |
+| small | 33.864 s | 6.37 s / 6.46 s | 5.3 / 5.2 | 843 MiB |
+
+Each run is a fresh process: model load, transcription, alignment and export, with a fresh transcription cache, so the wall clock is the end-to-end cost of one CLI invocation. The one-time model download (small: ~464 MB) is not included. Peak RSS is the kernel-reported maximum resident set size from `/usr/bin/time -v`. At this short audio length the fixed model-load cost is a large share of wall clock; the ratio column is the figure that scales with duration.
+
 ## Known gaps
 
 These are tracked as open issues, so their status and any progress are visible:
