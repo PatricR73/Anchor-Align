@@ -1,149 +1,149 @@
 # anchor-align
 
-Aligns a human-edited transcript to word-level timing produced by STT,
-then segments it into VTT/SRT caption cues.
+**Frame-accurate WebVTT captions from human-edited transcripts.**
 
-## The problem
-
-Speech-to-text gives word-level timestamps for what was actually said; a
-human editor's cleaned-up transcript (fillers removed, names fixed,
-sentences reordered) is what should actually be captioned — but it no
+Speech-to-text gives you word-level timestamps for what was actually said.
+A human editor's cleaned-up transcript — fillers removed, names fixed,
+sentences reordered — is what should actually be captioned, but it no
 longer lines up word-for-word with the STT output that carries the timing.
-This project recovers, for every word in the edited transcript, the
+anchor-align recovers, for every word in the edited transcript, the
 timestamp it should have — robust to small text changes and to whole
-sentences moving — then turns that into caption cues that satisfy
-line/duration/reading-speed constraints without ever overlapping.
+sentences moving — then segments the result into caption cues that satisfy
+line, duration and reading-speed constraints without ever overlapping.
 
-## Pipeline
+## The result, without the hedge
 
-| Stage | Module | What it does |
-|---|---|---|
-| S0 | `models.py`, `interfaces.py` | Data contracts (Pydantic v2, frozen) and the protocols the stages implement |
-| S1 | `corrupt/` | Synthetic "human-edited transcript" generator with ground-truth mapping, for benchmarking; synthetic corpus with realistic pause structure |
-| S2 | `normalize/` | 7-step normalization to a comparable form: span-invariant tokenizer, Unicode folding, punctuation-as-data, casefold/ASCII fold, phonetic keys, contractions, numeral expansion |
-| S3 | `align/` | Anchor detection + displaced-block chaining, weighted Needleman-Wunsch, variant-merge repair, syllable-weighted interpolation, `align()` orchestrator, audio-order resolution |
-| S4 | `benchmark/` | `difflib` baseline, `compute_metrics`, `compute_drift`, Polars aggregation + matplotlib plots via `run_benchmark` |
-| S5 | `segment/` | Dynamic-programming cue segmentation over the caption constraints |
-| S6 | `ingest/` | ffmpeg audio extraction, DOCX/TXT transcript parsing |
-| S7 | `stt/` | faster-whisper adapter (default), optional WhisperX/ElevenLabs adapters, diskcache transcription cache |
-| S8 | `export/` | VTT/SRT writers, QC report, per-cue confidence JSON |
-| S9 | `demo/` | Streamlit app: upload, run the pipeline, review |
-| — | `pipeline.py`, `cli.py` | One-call `align_to_cues()` and the `anchor-align` command-line entry point |
+On a 40-minute file, a naive `difflib` baseline's timing error at the end
+is **3x worse than at the start** (370.9ms tail vs 120.5ms body at
+corruption level 0.3). anchor-align's is not — its tail error never
+exceeds its body error, because periodic re-anchoring re-establishes
+position instead of accumulating drift.
 
-The caption limits (2 lines, 42 chars/line, 1-7s, 21 chars/s) live in
-`caption_constraints.py` — the single source both segmentation and QC
-enforce.
+On transcripts where the editor moved a paragraph, worst-case timing
+error drops from **20.5s (baseline) to 6.7s** — and where a relocated
+block is recovered, its timing is recovered exactly.
 
-## Setup
+![Drift: body vs tail error, untouched tokens only](benchmarks/results/drift_not_touched.png)
 
-With uv:
+![Mean boundary error vs corruption level](benchmarks/results/mean_error_vs_level.png)
 
-```bash
-uv sync --all-extras --dev
-uv run pytest
-uv run ruff check .
-uv run mypy src/anchor_align
-```
+The caveats, in full, in [BENCHMARKS.md](BENCHMARKS.md): every number comes
+from a synthetic corruption model calibrated by feel, not from real
+(raw transcript, published edited transcript) pairs. The 0.0ms recovery
+result is a property of the corruption model, not a bound on
+editing-in-general. Read that file before quoting any of this.
 
-Without uv (Python 3.11+):
+## Quickstart
 
 ```bash
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"     # Python 3.11+
 ```
+
+One file:
+
+```bash
+anchor-align podcast.mp3 transcript.docx --out captions/
+```
+
+An entire directory (batch mode — pairs each audio file with its
+same-stem `.txt`/`.docx`, writes per-file outputs plus a QC summary):
+
+```bash
+anchor-align --batch episodes/ --out captions/
+```
+
+Output: `captions.vtt`, `captions.srt`, `captions.confidence.json`, and
+(in batch mode) `qc_summary.csv` with cues/error/warning/confidence
+counts per file.
 
 ## Usage
 
-Command line:
+### Command line
 
-```bash
-anchor-align podcast.mp3 transcript.docx --out captions/ --model base
+```
+usage: anchor-align [-h] [--batch DIR] [--out OUT] [--model MODEL]
+                    [--language LANGUAGE] [--keyterm TERM] [--phonetic]
+                    [--cache-dir CACHE_DIR] [--verbose]
+                    [audio] [transcript]
 ```
 
-Writes `captions.vtt`, `captions.srt` and `confidence.json` into the
-output directory. `--language`, repeatable `--keyterm` hints, and
-`--cache-dir` are available; run `anchor-align --help` for the full list.
+`--model` picks the faster-whisper size (`base` is the default; use
+`small`/`medium` for accuracy), `--keyterm` is repeatable vocabulary
+hinting, `--phonetic` enables Double Metaphone phonetic matching (see
+[DESIGN.md](DESIGN.md) for why it is opt-in), and transcriptions are
+disk-cached so re-runs don't re-transcribe.
 
-As a library:
+### As a library
 
 ```python
-from anchor_align.ingest.document import parse_transcript
 from anchor_align.pipeline import align_to_cues
 from anchor_align.stt.cache import cached_transcribe
 from anchor_align.stt.faster_whisper_adapter import FasterWhisperAdapter
+from anchor_align.ingest.document import parse_transcript
 
 adapter = FasterWhisperAdapter(model_size="base")
 transcription = cached_transcribe(audio_path, "faster-whisper-base", adapter, STTOptions())
 result = align_to_cues(transcription.words, parse_transcript(transcript_path))
+
+result.cues          # the captions, ready for VTT/SRT export
+result.audio_order   # words in true audio order (the only order export accepts)
+result.issues        # every QC finding, aggregated across stages
 ```
 
-`result.cues` are the captions; `result.audio_order` is the words in true
-audio order (the only order the export writers accept); `result.issues`
-carries every QC finding.
-
-Demo:
+### Demo
 
 ```bash
 streamlit run demo/app.py
 ```
 
-## Benchmark caveats
+Upload audio + an edited transcript, and get a confidence heatmap over the
+transcript, a click-to-seek player, the QC report, and VTT/SRT downloads.
 
-Every number in this repo's benchmark story comes from a synthetic
-corruption model calibrated by feel, not from real (raw transcript,
-published edited transcript) pairs. Two things remain unmeasured until
-real data exists:
+### Docker
 
-- **Gold timing noise.** STT timestamps carry their own error, worst
-  precisely on disfluencies — the same things the `filler_removal` and
-  `repetition_collapse` transforms target. Without a hand-labeled sample,
-  no measured improvement has a known noise floor.
-- **Real edit distribution.** Base rates in `CorruptionConfig` are tuned
-  by feel. A held-out set of real edited transcripts is needed before any
-  benchmark table can be read as a validated measurement.
+```bash
+docker compose up demo          # Streamlit app on :8501
+docker compose run --rm cli --batch /input --out /output
+```
 
-Treat all S1-derived numbers as directional.
+## Where it breaks down
 
-## Known limits of the aligner
+- **Chains shorter than 3 anchors are not recovered.** A genuinely short
+  or fragmented relocation falls through to pre-chaining behavior for that
+  span, by construction — the one named gap in the alignment strategy.
+- **No validation against real edits yet.** Every benchmark number comes
+  from synthetic corruption calibrated by feel. A held-out set of 50-200
+  real (raw, published edited) transcript pairs is the single highest-value
+  missing artifact.
+- **A leading/trailing orphan run with no anchor on either side**
+  collapses several words to one timestamp; those words are dropped from
+  cue output and flagged `ZERO_DURATION_SPAN` rather than assigned a fake
+  span — correct, but that span has no caption until a human reviews it.
 
-- Chains shorter than 3 anchors are not recovered: a genuinely short or
-  fragmented relocation falls through to pre-chaining behavior for that
-  span, by construction.
-- A leading/trailing orphan run with no anchor on either side collapses
-  several words to one timestamp; those words are dropped from cue output
-  and flagged `ZERO_DURATION_SPAN` rather than assigned a fake span.
-- Exact 0.0ms recovery on relocated blocks is a property of this
-  corruption model (S1 relocates text verbatim), not a general claim about
-  reordering: when an editor rewrites a moved block's seams, 0.0 does not
-  hold.
+## How it works
 
-## Design decisions worth knowing before you change anything
+| Stage | What it does |
+|---|---|
+| **Normalize** | Both streams to a comparable form: span-invariant tokenizer, Unicode folding, punctuation as data, casefold, phonetic keys, contractions, numerals as segment nodes with alternate readings |
+| **Anchor** | Long, rare, unique words matched in both streams; displaced-block chaining (the MUMmer/minimap2 technique) recovers whole relocated spans a monotone aligner can't express |
+| **Align** | Weighted Needleman-Wunsch per anchor-bounded segment, edit distance blended with optional phonetic overlap, low-similarity substitutions rejected instead of forced, variant merges repaired |
+| **Interpolate** | Syllable-weighted timing for unmatched words, resolved once per segment in audio order — never re-interpolated globally |
+| **Segment** | Dynamic programming over break points against the caption constraints (2 lines, 42 chars, 1-7s, 21 chars/s), pysbd sentence-boundary bonus, duration padding |
+| **QC** | Independent verification of every constraint, per-cue confidence JSON, transposed-block flags |
 
-- **Interpolation happens exactly once, at the point of production,
-  bounded by its own segment's anchors.** There is no signal on an
-  `AlignedWord` for "already resolved locally" vs. "still a raw
-  placeholder", so a document-wide re-interpolation pass would silently
-  overwrite segment-local resolution. Do not re-add one.
-- **Captions are emitted in audio order, not document order — always.**
-  A caption file's cue order *is* its timeline; a moved block is emitted
-  at its true audio position and flagged `TRANSPOSED_BLOCK` (info
-  severity, "needs human review") naming the edited-index range that
-  moved. `segment_into_cues` and `qc_report` both raise on input that
-  skips `resolve_audio_order`.
-- **S1's corruption output is pinned.** `corrupt()` is deterministic per
-  (master_seed, doc_id, level), draw-then-threshold sampling makes low
-  levels strict subsets of high levels, and a golden test pins the exact
-  output. Bump `GENERATOR_VERSION` in `corrupt/corruptor.py` on any
-  transform-logic change, and regenerate the pinned hashes deliberately.
+Results so far: [BENCHMARKS.md](BENCHMARKS.md). Design decisions and
+rationale: [DESIGN.md](DESIGN.md).
 
 ## Development
 
 ```bash
-pytest                # full suite (includes the benchmark comparisons; several minutes)
-pytest -k "not benchmark"  # quick pass over unit tests only
+uv sync --frozen --all-extras --dev    # or: pip install -e ".[dev]"
+pytest                 # full suite, including the benchmark comparisons
+pytest -k "not benchmark"   # unit tests only
 ruff check .
 mypy src/anchor_align
 ```
 
-Tests mirror the package layout under `tests/`; the benchmark tests print
-the numbers that feed this README via `pytest -s`.
+## License
+
+MIT — see [LICENSE](LICENSE).

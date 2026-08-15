@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "anchor-align"
 version = "0.1.0"
-description = "Aligns a human-edited transcript to word-level timing from raw STT output, then segments it into caption cues."
+description = "Frame-accurate WebVTT captions from human-edited transcripts. Recovers timing after edits and whole-sentence moves, with WCAG/EAA-ready QC output."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
