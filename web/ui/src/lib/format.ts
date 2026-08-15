@@ -25,8 +25,7 @@ export function fmtPct(c: number): string {
   return `${Math.round(c * 100)}%`
 }
 
-export function fmtBytes(s: string): string {
-  const bytes = new Blob([s]).size
+export function fmtBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`

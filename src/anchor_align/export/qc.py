@@ -110,12 +110,12 @@ def qc_report(cues: list[Cue]) -> list[QCIssue]:
     return issues
 
 
-def write_confidence_json(cues: list[Cue], aligned_words: list[AlignedWord], output_path: Path) -> Path:
-    """Write per-cue confidence stats as JSON: mean/min confidence over the
-    `AlignedWord`s each cue's `word_span` covers — the same AlignedWord
-    list CueBuilder was called with, per `Cue.word_span`'s contract.
-    Confidence lives on `AlignedWord`, not `Cue`, so `aligned_words` is
-    required here rather than derived from `cues` alone.
+def format_confidence_json(cues: list[Cue], aligned_words: list[AlignedWord]) -> str:
+    """Return per-cue confidence stats as a JSON string: mean/min confidence
+    over the `AlignedWord`s each cue's `word_span` covers — the same
+    AlignedWord list CueBuilder was called with, per `Cue.word_span`'s
+    contract. Confidence lives on `AlignedWord`, not `Cue`, so
+    `aligned_words` is required here rather than derived from `cues` alone.
     """
     report = []
     for cue in cues:
@@ -132,5 +132,10 @@ def write_confidence_json(cues: list[Cue], aligned_words: list[AlignedWord], out
                 "word_count": len(span_words),
             }
         )
-    output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return json.dumps(report, indent=2)
+
+
+def write_confidence_json(cues: list[Cue], aligned_words: list[AlignedWord], output_path: Path) -> Path:
+    """Write per-cue confidence stats as JSON (see format_confidence_json)."""
+    output_path.write_text(format_confidence_json(cues, aligned_words), encoding="utf-8")
     return output_path

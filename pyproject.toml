@@ -27,6 +27,12 @@ dependencies = [
     "polars>=1.0",
     "matplotlib>=3.9",
     "streamlit>=1.36",
+    # Web app (web/api.py + tests/test_web_api.py). Declared here, not just
+    # present in the venv: CI installs with uv sync --frozen and would
+    # otherwise fail to import web.api.
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

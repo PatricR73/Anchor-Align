@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { MotionConfig } from 'motion/react'
-import { alignAudio, fetchSample, type AlignResult, type Model } from './lib/api'
+import { alignAudio, ApiError, fetchSample, type AlignResult, type Model } from './lib/api'
 import { Header } from './components/Header'
 import { IdleView } from './components/IdleView'
 import { WorkingView } from './components/WorkingView'
@@ -12,7 +12,10 @@ type Phase = 'idle' | 'working' | 'done' | 'error'
 export default function App() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<AlignResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ code: string; message: string } | null>(null)
+  // null = not uploading (processing, or the sample which needs no upload);
+  // 0..99 = upload in progress; 100 = upload done, processing
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
   const [audio, setAudio] = useState<File | null>(null)
   const [transcript, setTranscript] = useState<File | null>(null)
@@ -21,12 +24,21 @@ export default function App() {
 
   const run = useCallback(async (a: File, t: File, m: Model, ph: boolean) => {
     setPhase('working')
+    setUploadProgress(0)
     setError(null)
     try {
-      setResult(await alignAudio(a, t, m, ph))
+      setResult(
+        await alignAudio(a, t, m, ph, (sent, total) => {
+          setUploadProgress(total > 0 ? Math.round((sent / total) * 100) : 0)
+        }),
+      )
       setPhase('done')
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(
+        e instanceof ApiError
+          ? { code: e.code, message: e.message }
+          : { code: 'UNKNOWN', message: e instanceof Error ? e.message : String(e) },
+      )
       setPhase('error')
     }
   }, [])
@@ -37,12 +49,17 @@ export default function App() {
 
   const handleSample = useCallback(async () => {
     setPhase('working')
+    setUploadProgress(null)
     setError(null)
     try {
       setResult(await fetchSample())
       setPhase('done')
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(
+        e instanceof ApiError
+          ? { code: e.code, message: e.message }
+          : { code: 'UNKNOWN', message: e instanceof Error ? e.message : String(e) },
+      )
       setPhase('error')
     }
   }, [])
@@ -77,10 +94,15 @@ export default function App() {
               model={model}
               audioName={audio?.name}
               transcriptName={transcript?.name}
+              uploadProgress={uploadProgress}
             />
           )}
           {phase === 'error' && (
-            <ErrorView error={error ?? 'Unknown error'} onRetry={handleAlign} onBack={reset} />
+            <ErrorView
+              error={error ?? { code: 'UNKNOWN', message: 'Unknown error' }}
+              onRetry={handleAlign}
+              onBack={reset}
+            />
           )}
           {phase === 'done' && result && <ResultView result={result} onReset={reset} />}
         </main>

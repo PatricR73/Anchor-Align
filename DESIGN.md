@@ -111,3 +111,32 @@ parquet tables and charts in `benchmarks/results/` are regenerable with
 `run_benchmark`, and every result row carries `config_hash`/`master_seed`/
 `doc_id` so a score can always be traced to the exact corruption run that
 produced it.
+
+## Confidence is encoded twice — color AND solidity (web UI)
+
+Every confidence visual in the web UI carries a *second, color-independent*
+channel, and that channel is not decoration: it exists because the color
+ramp alone fails for a large share of users, measured, not guessed.
+
+- The ramp runs red -> amber -> phosphor along the red-green confusion
+  axis. Simulated under deuteranopia (Machado matrices, in
+  `web/ui/src/lib/colors.ts`), the mid-amber and high-green bands collapse
+  in luminance (dL 0.016); under protanopia the red/green hue distinction
+  vanishes outright. Grayscale loses the hue entirely. "Look at the red
+  words" therefore excludes deuteranopes, protanopes, and grayscale
+  contexts, and the numbers above are why the second channel exists.
+- The second channel encodes *solidity*: lower confidence is rendered
+  thinner (font weight 400..650) in the heatmap and shorter (bar height
+  25%..100%) in the timeline. Both derive from the same `confidenceSolidity`
+  function in `colors.ts`, so the channels share one source of truth and
+  cannot drift apart. The mapping is monotonic (more solid = more
+  confident), which implies no false ordering between words.
+- Do NOT revert this channel as "visual noise". A patch that removes the
+  font-weight/height encoding to clean up the visuals removes the only
+  confidence signal a deuteranope or a grayscale reader has. If the look
+  needs changing, change the ramp or the encoding — not the redundancy.
+- CI guards the encoding structurally: `probe-color.mjs` verifies the
+  dichromacy luminance separation under simulation, and the P1
+  `timeline-widths.mjs` check keeps the height encoding from breaking the
+  segment-width invariant (a width regression would hide the height
+  channel by overflowing the strip).

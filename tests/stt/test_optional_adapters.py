@@ -5,6 +5,8 @@ happy-path wiring is unverified, see each adapter's own docstring."""
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 from anchor_align.exceptions import TranscriptionError
@@ -13,6 +15,10 @@ from anchor_align.stt.elevenlabs_adapter import ElevenLabsAdapter
 from anchor_align.stt.whisperx_adapter import WhisperXAdapter
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("whisperx") is not None,
+    reason="whisperx extra installed (uv sync --all-extras); the missing-package path is unverifiable",
+)
 def test_whisperx_adapter_raises_clear_import_error_when_package_missing(tmp_path):
     adapter = WhisperXAdapter()
     with pytest.raises(ImportError, match="whisperx"):
@@ -38,6 +44,10 @@ def test_elevenlabs_adapter_explicit_key_overrides_env(monkeypatch):
     assert adapter.api_key == "explicit-key"
 
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("elevenlabs") is not None,
+    reason="elevenlabs extra installed (uv sync --all-extras); the missing-package path is unverifiable",
+)
 def test_elevenlabs_adapter_raises_clear_import_error_when_package_missing(tmp_path):
     adapter = ElevenLabsAdapter(api_key="fake-key")
     with pytest.raises(ImportError, match="elevenlabs"):

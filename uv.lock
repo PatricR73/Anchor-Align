@@ -195,6 +195,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "diskcache" },
+    { name = "fastapi" },
     { name = "faster-whisper" },
     { name = "matplotlib" },
     { name = "metaphone" },
@@ -205,8 +206,10 @@ dependencies = [
     { name = "pydantic" },
     { name = "pysbd" },
     { name = "python-docx" },
+    { name = "python-multipart" },
     { name = "rapidfuzz" },
     { name = "streamlit" },
+    { name = "uvicorn" },
     { name = "webvtt-py" },
 ]
 
@@ -228,6 +231,7 @@ whisperx = [
 requires-dist = [
     { name = "diskcache", specifier = ">=5.6" },
     { name = "elevenlabs", marker = "extra == 'elevenlabs'" },
+    { name = "fastapi", specifier = ">=0.110" },
     { name = "faster-whisper", specifier = ">=1.0" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "matplotlib", specifier = ">=3.9" },
@@ -240,13 +244,24 @@ requires-dist = [
     { name = "pysbd", specifier = ">=0.3.4" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
     { name = "python-docx", specifier = ">=1.1" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "rapidfuzz", specifier = ">=3.9" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "streamlit", specifier = ">=1.36" },
+    { name = "uvicorn", specifier = ">=0.29" },
     { name = "webvtt-py", specifier = ">=0.4.6" },
     { name = "whisperx", marker = "extra == 'whisperx'" },
 ]
 provides-extras = ["whisperx", "elevenlabs", "dev"]
+
+[[package]]
+name = "annotated-doc"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/8e/38aa427ed5402449e226975b649c5dc73ccadfefeb95e6aecb8f8ea4b6b6/annotated_doc-0.0.5.tar.gz", hash = "sha256:c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb", size = 10758, upload-time = "2026-07-28T13:50:58.129Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl", hash = "sha256:117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101", size = 5302, upload-time = "2026-07-28T13:50:57.239Z" },
+]
 
 [[package]]
 name = "annotated-types"
@@ -766,6 +781,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/af/f3/0931fc203e86797e46c132174990f6476141ee4593631b8b42d19b00817a/elevenlabs-2.64.0.tar.gz", hash = "sha256:97cab1d3b84019a08f0e52fa00c8ed38dae9276e4209745be929cb3f6d830426", size = 777749, upload-time = "2026-08-14T14:36:41.462Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d3/c7/f70ff6b05fd040238500894d4092c8416a7049f1dd2a6b1843a5b8c972fe/elevenlabs-2.64.0-py3-none-any.whl", hash = "sha256:806bb8123f7b3d0559cb67537e819dacdc7a2df7cda8334a99627e6a92cf8f8a", size = 2062258, upload-time = "2026-08-14T14:36:39.501Z" },
+]
+
+[[package]]
+name = "fastapi"
+version = "0.141.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "annotated-doc" },
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/02/91e3416a8fdd715abb903a952a6bec7cdd8d14eed55d415fc8595524c319/fastapi-0.141.1.tar.gz", hash = "sha256:e8822fc40db1e1858054d7a949a888695bc9bdce70139178e33bd2871a453ca1", size = 425799, upload-time = "2026-07-29T17:18:05.568Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/03/10388a42375ee7e4ac9b94eb2c5c569c8b5795e377e701c9ac3ad63de890/fastapi-0.141.1-py3-none-any.whl", hash = "sha256:bfb91aa2d334c61cb35ba9a116fc123b3d3df31640b801cf57a7a78ec3f603b3", size = 131954, upload-time = "2026-07-29T17:18:04.364Z" },
 ]
 
 [[package]]

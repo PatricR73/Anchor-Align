@@ -29,11 +29,13 @@ def _format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
 
-def write_vtt(cues: list[Cue], output_path: Path) -> Path:
-    """Write `cues` as a WebVTT file. Cue numbering blocks use `cue.index`
-    directly — WebVTT cue identifiers are optional free-form text per spec,
-    so no renumbering is imposed here; whatever index S5 assigned is what a
-    QC message referencing `cue_index` will match against in the file.
+def format_vtt(cues: list[Cue]) -> str:
+    """Return `cues` as a WebVTT string (the exact bytes write_vtt writes).
+
+    Cue numbering blocks use `cue.index` directly — WebVTT cue identifiers
+    are optional free-form text per spec, so no renumbering is imposed here;
+    whatever index S5 assigned is what a QC message referencing `cue_index`
+    will match against in the file.
 
     A cue whose `start` precedes the previous cue's `end` by less than
     MAX_CLAMPED_OVERLAP_S is nudged to `prev_end + GAP_FLOOR_S` for display
@@ -54,6 +56,11 @@ def write_vtt(cues: list[Cue], output_path: Path) -> Path:
         lines.extend(cue.lines)
         lines.append("")
         prev_end = cue.end
-    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return "\n".join(lines)
+
+
+def write_vtt(cues: list[Cue], output_path: Path) -> Path:
+    """Write `cues` as a WebVTT file (see format_vtt for the formatting)."""
+    output_path.write_text(format_vtt(cues), encoding="utf-8")
     logger.info("wrote %d cues to %s", len(cues), output_path)
     return output_path

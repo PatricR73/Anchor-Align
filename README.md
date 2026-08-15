@@ -4,11 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-Takes a transcript that an editor cleaned up and the word timings from speech-to-text, and produces VTT caption cues.
+**Since June 2025, the European Accessibility Act requires captions on video and e-learning sold into the EU.** That obligation lands on localization vendors, podcast networks, e-learning teams and broadcasters — the publishers who already hold a human-edited transcript.
 
-Built for localization vendors, podcast networks, e-learning teams and broadcasters who publish human-edited transcripts and need compliant captions generated from them.
-
-The European Accessibility Act has been enforceable since June 2025 and creates a captioning obligation for media and e-learning sold into the EU.
+A human-edited transcript has no timing. The speech-to-text run that produced the original words has timing, but it no longer matches the edited text. anchor-align bridges the two: it recovers, for every edited word, the timestamp it should have — surviving small edits and whole moved sentences — then segments the result into VTT caption cues that obey the standard constraints (two lines, 42 chars per line, one to seven seconds, 21 chars per second) and never overlap. Boundary error on words the editor did not touch stays in single-digit milliseconds where the difflib baseline drifts to a third of a second or more (table below; full caveats in [BENCHMARKS.md](BENCHMARKS.md)).
 
 ## Results at a glance
 
@@ -21,7 +19,18 @@ The European Accessibility Act has been enforceable since June 2025 and creates 
 
 ![Drift: body vs tail error, untouched tokens only](benchmarks/results/drift_not_touched.png)
 
-The benchmark corpus is synthetic and there is no validation on real transcripts yet; see BENCHMARKS.md for the full caveats.
+The benchmark corpus is synthetic and there is no validation on real transcripts yet; see [BENCHMARKS.md](BENCHMARKS.md) for the full caveats. What closes that gap is one real-transcript validation:
+
+- **Material.** One recording, 10–30 minutes, permissively licensed (e.g. a Creative Commons podcast episode); its raw faster-whisper transcription (the pipeline's normal input); and a genuinely human-edited transcript of it — an editor doing their normal job: dropped fillers, corrected names, moved sentences. The editor must not see the timings.
+- **Ground truth.** Reference word boundaries from an independent forced alignment of the *edited* transcript — Montreal Forced Aligner, or WhisperX's forced alignment as the cheaper fallback — deliberately independent of the pipeline's own STT pass, since that pass is what is being tested. Spot-check the worst 1% of boundaries by ear.
+- **Measurement.** The exact harness the synthetic numbers come from — `compute_metrics` (`src/anchor_align/benchmark/runner.py`) and `compute_drift` (`src/anchor_align/benchmark/drift.py`): mean / tail-mean / p95 absolute boundary error on untouched vs edited words, reported as one row in the same tables.
+- **Smallest credible version.** One episode, one edited transcript, one forced-alignment pass, one benchmark row marked `corpus="real"`. If the row matches the synthetic numbers, the model transfers; if not, the delta names the next experiment.
+
+## See it
+
+Click a low-confidence word and the player jumps to the instant the model heard it — the word the transcript may have misheard:
+
+![Click a low-confidence word to hear what the model actually heard](docs/click-to-hear.gif)
 
 ## The problem this solves
 

@@ -14,3 +14,74 @@ jobs:
       - run: uv run ruff check .
       - run: uv run mypy src/anchor_align
       - run: uv run pytest
+
+  # Web app: every push rebuilds the 9,000-word fixture, starts the API and
+  # the Vite dev server, and runs the browser tools that assert the P-series
+  # invariants — a11y/contrast/overflow (audit.mjs), the P0 low-confidence
+  # word visible+clickable+seeks to <50ms (demo-shoot.mjs), the P1 timeline
+  # segment-width <= 100% invariant (timeline-widths.mjs), the playback
+  # scaling budget (profile-playback.mjs), and the P6 payload / P7 bundle
+  # size budgets. Each tool exits non-zero on violation.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/ui/package-lock.json
+      - run: uv sync --frozen --all-extras --dev
+      - name: Generate the large fixture
+        run: uv run python web/scripts/make_fixture.py
+      - name: Start API
+        run: |
+          ALLOW_FIXTURES=1 HF_HUB_OFFLINE=1 uv run uvicorn web.api:app --port 8000 --host 127.0.0.1 > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/api/health
+      - name: Install frontend deps
+        run: cd web/ui && npm ci
+      # Cache the downloaded Chromium across runs; the first push pays the
+      # download, every later one hits the cache (keyed on the lockfile).
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('web/ui/package-lock.json') }}
+      - name: Install Playwright browser
+        run: cd web/ui && npx playwright install --with-deps chromium
+      - name: Production build
+        run: cd web/ui && npm run build
+      - name: P7 bundle budget
+        run: cd web/ui && node tools/bundle-budget.mjs
+      - name: Start Vite dev server
+        run: |
+          cd web/ui && npm run dev > /tmp/vite.log 2>&1 &
+          echo $! > /tmp/vite.pid
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:5173/ > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:5173/
+      - name: A11y audit (390px, fixture)
+        run: cd web/ui && node tools/audit.mjs "http://127.0.0.1:5173/?fixture=large" 390 sample
+      - name: P0 low-confidence word (desktop + mobile)
+        run: cd web/ui && node tools/demo-shoot.mjs "http://127.0.0.1:5173/?fixture=large"
+      - name: P1 timeline segment widths (arithmetic)
+        run: cd web/ui && node tools/timeline-widths.mjs "http://127.0.0.1:5173"
+      - name: P10 confidence solidity channel (color-blind redundancy)
+        run: cd web/ui && node tools/probe-color.mjs
+      - name: Playback scaling budget
+        run: cd web/ui && node tools/profile-playback.mjs "http://127.0.0.1:5173/?fixture=large"
+      - name: P6 payload budget
+        run: cd web/ui && node tools/payload-budget.mjs "http://127.0.0.1:5173"
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $(cat /tmp/api.pid) 2>/dev/null || true
+          kill $(cat /tmp/vite.pid) 2>/dev/null || true

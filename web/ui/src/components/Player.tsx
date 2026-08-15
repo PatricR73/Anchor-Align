@@ -6,7 +6,7 @@ import type { Playback } from '../hooks/usePlayback'
 import { WordTimeline } from './WordTimeline'
 
 export function Player({ result, playback }: { result: AlignResult; playback: Playback }) {
-  const { audioRef, playing, time, duration, seek, toggle } = playback
+  const { audioRef, playheadRef, playing, time, duration, seek, toggle } = playback
 
   return (
     <div className="panel p-4 sm:p-5">
@@ -20,7 +20,7 @@ export function Player({ result, playback }: { result: AlignResult; playback: Pl
         >
           {playing ? <Pause className="h-[18px] w-[18px]" aria-hidden="true" /> : <Play className="h-[18px] w-[18px] translate-x-[1px]" aria-hidden="true" />}
         </button>
-        <WordTimeline words={result.aligned} duration={duration} currentTime={time} onSeek={seek} />
+        <WordTimeline words={result.aligned} duration={duration} time={time} playheadRef={playheadRef} onSeek={seek} />
         <p className="w-[92px] shrink-0 text-right font-mono text-[12.5px] text-muted">
           {fmtClock(time)} <span className="text-faint">/</span> {fmtClock(duration)}
         </p>

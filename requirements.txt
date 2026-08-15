@@ -13,3 +13,7 @@ webvtt-py>=0.4.6
 polars>=1.0
 matplotlib>=3.9
 streamlit>=1.36
+# Web app (web/api.py + tests/test_web_api.py); mirrors pyproject.toml.
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9

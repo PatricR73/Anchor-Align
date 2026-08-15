@@ -18,13 +18,14 @@ def _format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{ms:03d}"
 
 
-def write_srt(cues: list[Cue], output_path: Path) -> Path:
-    """Write `cues` as an SRT file. Unlike WebVTT, SRT's sequence numbers
-    are not optional decoration — most parsers expect a contiguous 1-based
-    sequence. `cue.index` is used as-is (not remapped): the caller (S5) is
-    responsible for handing this function cues already numbered 1..N in
-    order, the same assumption write_vtt makes when it uses `cue.index`
-    for cross-referencing QC messages.
+def format_srt(cues: list[Cue]) -> str:
+    """Return `cues` as an SRT string (the exact bytes write_srt writes).
+
+    Unlike WebVTT, SRT's sequence numbers are not optional decoration — most
+    parsers expect a contiguous 1-based sequence. `cue.index` is used as-is
+    (not remapped): the caller (S5) is responsible for handing this function
+    cues already numbered 1..N in order, the same assumption write_vtt makes
+    when it uses `cue.index` for cross-referencing QC messages.
     """
     blocks = []
     for cue in cues:
@@ -36,6 +37,11 @@ def write_srt(cues: list[Cue], output_path: Path) -> Path:
             ]
         )
         blocks.append(block)
-    output_path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    return "\n\n".join(blocks) + "\n"
+
+
+def write_srt(cues: list[Cue], output_path: Path) -> Path:
+    """Write `cues` as an SRT file (see format_srt for the formatting)."""
+    output_path.write_text(format_srt(cues), encoding="utf-8")
     logger.info("wrote %d cues to %s", len(cues), output_path)
     return output_path

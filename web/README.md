@@ -40,7 +40,7 @@ of hitting Hugging Face.
 
 | Endpoint | Description |
 |---|---|
-| POST /api/align | multipart audio, transcript, model, phonetic, keyterms -> full result JSON |
+| POST /api/align | multipart audio, transcript, model, phonetic -> full result JSON |
 | GET /api/sample | runs the bundled sample pair, same payload shape |
 | GET /api/audio/{id} | streams the uploaded audio back for playback |
 | GET /api/health | liveness |
@@ -55,5 +55,9 @@ QC issues, stats, and ready-made VTT/SRT/confidence-JSON download strings.
   node tools/audit.mjs <url> [width] [sample]
 - tools/demo-shoot.mjs — drives idle -> sample -> every tab at desktop and
   mobile, verifies seek/play/download, and captures .shots/*.png.
+- tools/test-missing-token.mjs — regression for the active-word highlight
+  being position-based: serves a payload with token index 5 missing and
+  asserts the correct word highlights (plus the dev-mode invariant tripwire
+  fires).
 
 Screenshots go to .shots/ at the repo root (gitignored).

@@ -1,7 +1,8 @@
 // usage: node tools/audit.mjs <url> [width] [sample]
 // Asserts the cheap objective things: no horizontal overflow at narrow
-// widths, every interactive element has an accessible name, visible focus
-// outlines, text/background contrast >= 4.5:1 (3:1 for large text).
+// widths, every interactive element has an accessible name, REACHABILITY by
+// real Tab/arrow traversal (not merely focus rings once focus arrives),
+// text/background contrast >= 4.5:1 (3:1 for large text).
 // Pass "sample" as the third arg to run the bundled sample first.
 import { chromium } from 'playwright'
 
@@ -38,25 +39,6 @@ const report = await page.evaluate(() => {
     const hasLabel = 'labels' in el && el.labels && el.labels.length > 0
     if (!name && !labelledby && !hasLabel) {
       out.unnamed.push({ tag: el.tagName, cls: String(el.className).slice(0, 70) })
-    }
-  }
-
-  const focusable = [
-    ...document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'),
-  ].slice(0, 40)
-  // real keyboard focus: Tab between elements so :focus-visible actually matches
-  document.body.focus()
-  for (let i = 0; i < focusable.length + 2; i++) {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
-  }
-  for (const el of focusable) {
-    if (el.matches(':focus-visible')) {
-      const cs = getComputedStyle(el)
-      const outlineVisible = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
-      const shadowVisible = cs.boxShadow !== 'none'
-      if (!outlineVisible && !shadowVisible) {
-        out.focus.push({ tag: el.tagName, cls: String(el.className).slice(0, 70), outline: cs.outline })
-      }
     }
   }
 
@@ -124,6 +106,102 @@ const report = await page.evaluate(() => {
   return out
 })
 
+// Real keyboard traversal: Tab through every control with actual key
+// presses (synthetic KeyboardEvent dispatch never moves focus), assert each
+// declared tab stop was REACHED and shows a focus ring, and arrow-navigate
+// the roving widgets (listbox, slider).
+async function auditFocus(page) {
+  const stops = await page.evaluate(() =>
+    [...document.querySelectorAll(
+      'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="slider"], [role="listbox"]',
+    )].map((el) => ({
+      tag: el.tagName,
+      role: el.getAttribute('role'),
+      name: (el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 30) || '').trim(),
+      cls: String(el.className).slice(0, 50),
+    })),
+  )
+
+  const seen = new Set()
+  const sequence = []
+  const noRing = []
+  const TABS = Math.max(stops.length * 3 + 6, 40)
+  for (let i = 0; i < TABS; i++) {
+    await page.keyboard.press('Tab')
+    const info = await page.evaluate(() => {
+      const el = document.activeElement
+      if (!el || el === document.body || el === document.documentElement) return null
+      const cs = getComputedStyle(el)
+      const ring = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
+      return {
+        tag: el.tagName,
+        role: el.getAttribute('role'),
+        name: (el.getAttribute('aria-label') || (el.textContent || '').trim().slice(0, 30) || '').trim(),
+        cls: String(el.className).slice(0, 50),
+        ring,
+      }
+    })
+    if (!info) continue
+    const key = info.tag + '|' + (info.role || '') + '|' + info.name + '|' + info.cls
+    seen.add(key)
+    if (!info.ring) noRing.push({ tag: info.tag, role: info.role, name: info.name, cls: info.cls })
+    if (sequence.length < 20) sequence.push({ tag: info.tag, role: info.role, name: info.name, cls: info.cls })
+  }
+
+  const stopKeys = new Set(stops.map((s) => s.tag + '|' + (s.role || '') + '|' + s.name + '|' + s.cls))
+  const unreachable = stops.filter((s) => !seen.has(s.tag + '|' + (s.role || '') + '|' + s.name + '|' + s.cls))
+
+  const arrows = {}
+  const lb = page.locator('[role="listbox"]')
+  if (await lb.count()) {
+    await lb.focus()
+    const a0 = await lb.getAttribute('aria-activedescendant')
+    await page.keyboard.press('ArrowRight')
+    const a1 = await lb.getAttribute('aria-activedescendant')
+    await page.keyboard.press('Home')
+    const aHome = await lb.getAttribute('aria-activedescendant')
+    await page.keyboard.press('End')
+    const aEnd = await lb.getAttribute('aria-activedescendant')
+    const firstId = await lb.evaluate((el) => el.querySelector('[role="option"]')?.id ?? null)
+    arrows.listbox = {
+      before: a0,
+      afterArrow: a1,
+      home: aHome,
+      end: aEnd,
+      arrowMoved: !!a0 && a0 !== a1,
+      homeOk: aHome === firstId,
+    }
+  }
+  const sl = page.locator('[role="slider"]')
+  if (await sl.count()) {
+    await sl.focus()
+    const v0 = Number(await sl.getAttribute('aria-valuenow'))
+    await page.keyboard.press('ArrowRight')
+    const v1 = Number(await sl.getAttribute('aria-valuenow'))
+    arrows.slider = { before: v0, after: v1, moved: v1 > v0 }
+  }
+
+  return { declaredStops: stops.length, sequence, unreachable, noRing, arrows }
+}
+
+report.focus = await auditFocus(page)
+
 console.log(JSON.stringify(report, null, 2))
 for (const e of pageErrors) console.log('PAGE ERROR:', e)
+
+// Exit non-zero on violations so CI fails: horizontal overflow, unnamed
+// interactive elements, unreachable declared tab stops, focus without a
+// visible ring, sub-4.5:1 contrast (3:1 large), and page errors.
+const violations = []
+if (report.overflow) violations.push('horizontal overflow: scrollWidth ' + report.overflow.scrollWidth + ' > innerWidth ' + report.overflow.innerWidth)
+if (report.unnamed.length) violations.push(report.unnamed.length + ' interactive element(s) without an accessible name')
+if (report.focus.unreachable.length) violations.push(report.focus.unreachable.length + ' declared tab stop(s) never reached: ' + report.focus.unreachable.map((s) => s.tag + ' ' + (s.name || s.cls)).join('; '))
+if (report.focus.noRing.length) violations.push(report.focus.noRing.length + ' focused element(s) with no visible focus ring')
+if (report.contrast.length) violations.push(report.contrast.length + ' contrast failure(s), worst ' + Math.min(...report.contrast.map((c) => c.ratio)) + ':1')
+if (pageErrors.length) violations.push(pageErrors.length + ' page error(s): ' + pageErrors[0])
+if (violations.length) {
+  console.log('AUDIT FAIL:')
+  for (const v of violations) console.log('  - ' + v)
+  process.exit(1)
+}
 await browser.close()
