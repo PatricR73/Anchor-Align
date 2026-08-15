@@ -96,9 +96,11 @@ docker compose run --rm cli --batch /input --out /output
 
 ## Known gaps
 
-- Relocations that leave fewer than three anchors behind are not recovered. A short or heavily fragmented move falls back to the older behavior for that span. This is the one structural gap I know about and haven't closed.
-- A run of orphan words at the very beginning or end, with no anchor on either side, collapses to a single timestamp. Those words are dropped from the captions and flagged ZERO_DURATION_SPAN. They don't get fake timing, which is the right call, but it means a human has to review that spot.
-- No validation on real transcripts. I keep saying this because it's the most important one.
+These are tracked as open issues, so their status and any progress are visible:
+
+- [Relocations that leave fewer than three anchors behind are not recovered](https://github.com/PatricR73/Anchor-Align/issues/1) — short or fragmented moves fall back to the older behavior for that span.
+- [A run of orphan words at the start or end of a file collapses to a single timestamp and is dropped from the captions](https://github.com/PatricR73/Anchor-Align/issues/2) — flagged ZERO_DURATION_SPAN for human review.
+- [No validation against real edited transcripts](https://github.com/PatricR73/Anchor-Align/issues/3) — every benchmark number comes from the synthetic corruption model.
 
 ## How it's organized
 
