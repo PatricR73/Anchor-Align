@@ -10,7 +10,13 @@ import statistics
 from itertools import pairwise
 from pathlib import Path
 
-from anchor_align.caption_constraints import MAX_DURATION_S, MAX_LINE_CHARS, MAX_LINES, MIN_DURATION_S, MAX_CPS
+from anchor_align.caption_constraints import (
+    MAX_CPS,
+    MAX_DURATION_S,
+    MAX_LINE_CHARS,
+    MAX_LINES,
+    MIN_DURATION_S,
+)
 from anchor_align.models import AlignedWord, Cue, QCCode, QCIssue
 
 logger = logging.getLogger(__name__)

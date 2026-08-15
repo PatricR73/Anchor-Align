@@ -25,7 +25,12 @@ from itertools import pairwise
 
 import pysbd
 
-from anchor_align.caption_constraints import MAX_DURATION_S, MAX_LINE_CHARS, MAX_LINES, MIN_DURATION_S, MAX_CPS
+from anchor_align.caption_constraints import (
+    MAX_CPS,
+    MAX_DURATION_S,
+    MAX_LINE_CHARS,
+    MIN_DURATION_S,
+)
 from anchor_align.models import AlignedWord, Cue, QCCode, QCIssue
 
 # Soft-cost weights. Relative magnitude matters more than any single value:
