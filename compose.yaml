@@ -1,0 +1,19 @@
+services:
+  demo:
+    build: .
+    command: streamlit run demo/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+    ports:
+      - "8501:8501"
+    volumes:
+      - transcription-cache:/root/.cache/anchor_align
+
+  cli:
+    build: .
+    profiles: ["cli"]
+    entrypoint: ["anchor-align"]
+    volumes:
+      - ./input:/input:ro
+      - ./output:/output
+
+volumes:
+  transcription-cache:
