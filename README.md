@@ -1,79 +1,60 @@
 # anchor-align
 
-**Frame-accurate WebVTT captions from human-edited transcripts.**
+Takes a transcript that an editor cleaned up and the word timings from speech-to-text, and figures out where each edited word actually falls in the audio. Then it turns that into VTT cues.
 
-Speech-to-text gives you word-level timestamps for what was actually said.
-A human editor's cleaned-up transcript — fillers removed, names fixed,
-sentences reordered — is what should actually be captioned, but it no
-longer lines up word-for-word with the STT output that carries the timing.
-anchor-align recovers, for every word in the edited transcript, the
-timestamp it should have — robust to small text changes and to whole
-sentences moving — then segments the result into caption cues that satisfy
-line, duration and reading-speed constraints without ever overlapping.
+## The problem this solves
 
-## The result, without the hedge
+Speech-to-text gives you timestamps for every word that was said. Then a human editor fixes the transcript: drops the "um"s, corrects the names, moves a sentence to a better place. The edited text reads properly now, but it no longer matches the STT output word for word, and the STT output is the only thing carrying timing. So you have a good transcript with no timing, and a timed transcript nobody wants to caption.
 
-On a 40-minute file, a naive `difflib` baseline's timing error at the end
-is **3x worse than at the start** (370.9ms tail vs 120.5ms body at
-corruption level 0.3). anchor-align's is not — its tail error never
-exceeds its body error, because periodic re-anchoring re-establishes
-position instead of accumulating drift.
+This project bridges that. It recovers, for every word in the edited transcript, the timestamp it should have, and it's designed to survive both small text changes and whole sentences being moved around. The cues it produces obey the usual caption constraints (two lines max, 42 characters per line, one to seven seconds, 21 characters per second) and never overlap.
 
-On transcripts where the editor moved a paragraph, worst-case timing
-error drops from **20.5s (baseline) to 6.7s** — and where a relocated
-block is recovered, its timing is recovered exactly.
+## Does it actually work?
+
+Short version:
+
+- On a long recording (40+ minutes), the naive approach's timing error at the end of the file is about three times what it is near the start. Error accumulates. anchor-align's stays flat, because it periodically re-anchors against words it's confident about.
+- When the editor moved a paragraph around, worst-case timing error went from about 20 seconds down to about 7 seconds, compared to the naive baseline. And when a moved block is recovered properly, the timing inside it is exact.
 
 ![Drift: body vs tail error, untouched tokens only](benchmarks/results/drift_not_touched.png)
 
 ![Mean boundary error vs corruption level](benchmarks/results/mean_error_vs_level.png)
 
-The caveats, in full, in [BENCHMARKS.md](BENCHMARKS.md): every number comes
-from a synthetic corruption model calibrated by feel, not from real
-(raw transcript, published edited transcript) pairs. The 0.0ms recovery
-result is a property of the corruption model, not a bound on
-editing-in-general. Read that file before quoting any of this.
+Both claims come with caveats, and they're spelled out in BENCHMARKS.md. The headline caveat: the benchmark corpus is synthetic. I corrupt clean transcripts with edits I chose, then measure against that. There's no validation against real edited transcripts yet, and that's the biggest open item. Read the caveats before quoting numbers.
 
-## Quickstart
+## Install
+
+Python 3.11 or newer.
 
 ```bash
-pip install -e ".[dev]"     # Python 3.11+
+pip install -e ".[dev]"
 ```
 
-One file:
+## Use
+
+A single file:
 
 ```bash
 anchor-align podcast.mp3 transcript.docx --out captions/
 ```
 
-An entire directory (batch mode — pairs each audio file with its
-same-stem `.txt`/`.docx`, writes per-file outputs plus a QC summary):
+A whole directory of episodes:
 
 ```bash
 anchor-align --batch episodes/ --out captions/
 ```
 
-Output: `captions.vtt`, `captions.srt`, `captions.confidence.json`, and
-(in batch mode) `qc_summary.csv` with cues/error/warning/confidence
-counts per file.
+Batch mode pairs each audio file with a same-named .txt or .docx, processes every pair, and writes qc_summary.csv with the per-file counts at the end.
 
-## Usage
+Output is captions.vtt, captions.srt and captions.confidence.json per file. The confidence JSON gives per-cue mean and min confidence, so you can spot weak stretches without opening the video.
 
-### Command line
+Flags worth knowing:
 
-```
-usage: anchor-align [-h] [--batch DIR] [--out OUT] [--model MODEL]
-                    [--language LANGUAGE] [--keyterm TERM] [--phonetic]
-                    [--cache-dir CACHE_DIR] [--verbose]
-                    [audio] [transcript]
-```
+- `--model` — faster-whisper size, `base` by default. `small` or `medium` if you need better accuracy and have the patience.
+- `--keyterm` — vocabulary hints, repeatable. Good for names.
+- `--phonetic` — enables Double Metaphone matching. It's off by default because when I benchmarked it on my synthetic corpus it made things worse: short words like "and" and "end" share a phonetic key, and the aligner started gluing them together across long distances. On real transcripts with homophone mishearings it might pay off, but I can't promise that yet. Details in DESIGN.md.
+- `--cache-dir` — where transcriptions are cached. Renaming a file doesn't bust the cache, it's keyed on content.
 
-`--model` picks the faster-whisper size (`base` is the default; use
-`small`/`medium` for accuracy), `--keyterm` is repeatable vocabulary
-hinting, `--phonetic` enables Double Metaphone phonetic matching (see
-[DESIGN.md](DESIGN.md) for why it is opt-in), and transcriptions are
-disk-cached so re-runs don't re-transcribe.
-
-### As a library
+As a library:
 
 ```python
 from anchor_align.pipeline import align_to_cues
@@ -85,65 +66,52 @@ adapter = FasterWhisperAdapter(model_size="base")
 transcription = cached_transcribe(audio_path, "faster-whisper-base", adapter, STTOptions())
 result = align_to_cues(transcription.words, parse_transcript(transcript_path))
 
-result.cues          # the captions, ready for VTT/SRT export
-result.audio_order   # words in true audio order (the only order export accepts)
-result.issues        # every QC finding, aggregated across stages
+result.cues          # the captions, ready to export
+result.audio_order   # words in true audio order; the exporters want this list
+result.issues        # every QC finding from all stages
 ```
 
-### Demo
+There's a Streamlit demo for looking at the output visually:
 
 ```bash
 streamlit run demo/app.py
 ```
 
-Upload audio + an edited transcript, and get a confidence heatmap over the
-transcript, a click-to-seek player, the QC report, and VTT/SRT downloads.
-
-### Docker
+And a Docker setup:
 
 ```bash
-docker compose up demo          # Streamlit app on :8501
+docker compose up demo
 docker compose run --rm cli --batch /input --out /output
 ```
 
-## Where it breaks down
+## Known gaps
 
-- **Chains shorter than 3 anchors are not recovered.** A genuinely short
-  or fragmented relocation falls through to pre-chaining behavior for that
-  span, by construction — the one named gap in the alignment strategy.
-- **No validation against real edits yet.** Every benchmark number comes
-  from synthetic corruption calibrated by feel. A held-out set of 50-200
-  real (raw, published edited) transcript pairs is the single highest-value
-  missing artifact.
-- **A leading/trailing orphan run with no anchor on either side**
-  collapses several words to one timestamp; those words are dropped from
-  cue output and flagged `ZERO_DURATION_SPAN` rather than assigned a fake
-  span — correct, but that span has no caption until a human reviews it.
+- Relocations that leave fewer than three anchors behind are not recovered. A short or heavily fragmented move falls back to the older behavior for that span. This is the one structural gap I know about and haven't closed.
+- A run of orphan words at the very beginning or end, with no anchor on either side, collapses to a single timestamp. Those words are dropped from the captions and flagged ZERO_DURATION_SPAN. They don't get fake timing, which is the right call, but it means a human has to review that spot.
+- No validation on real transcripts. I keep saying this because it's the most important one.
 
-## How it works
+## How it's organized
 
-| Stage | What it does |
-|---|---|
-| **Normalize** | Both streams to a comparable form: span-invariant tokenizer, Unicode folding, punctuation as data, casefold, phonetic keys, contractions, numerals as segment nodes with alternate readings |
-| **Anchor** | Long, rare, unique words matched in both streams; displaced-block chaining (the MUMmer/minimap2 technique) recovers whole relocated spans a monotone aligner can't express |
-| **Align** | Weighted Needleman-Wunsch per anchor-bounded segment, edit distance blended with optional phonetic overlap, low-similarity substitutions rejected instead of forced, variant merges repaired |
-| **Interpolate** | Syllable-weighted timing for unmatched words, resolved once per segment in audio order — never re-interpolated globally |
-| **Segment** | Dynamic programming over break points against the caption constraints (2 lines, 42 chars, 1-7s, 21 chars/s), pysbd sentence-boundary bonus, duration padding |
-| **QC** | Independent verification of every constraint, per-cue confidence JSON, transposed-block flags |
+- `normalize/` — makes both streams comparable without losing the original text.
+- `align/` — anchors, displaced-block chaining, the weighted Needleman-Wunsch, interpolation.
+- `segment/` — the dynamic program that chops aligned words into cues.
+- `ingest/`, `stt/`, `export/` — audio and transcript in, VTT/SRT/QC out.
+- `benchmark/` — the corruption model and all the measurements.
+- `pipeline.py`, `cli.py` — the one-call entry and the command line.
 
-Results so far: [BENCHMARKS.md](BENCHMARKS.md). Design decisions and
-rationale: [DESIGN.md](DESIGN.md).
+Why things are built the way they are: DESIGN.md. The methodology and full numbers: BENCHMARKS.md.
 
 ## Development
 
 ```bash
-uv sync --frozen --all-extras --dev    # or: pip install -e ".[dev]"
-pytest                 # full suite, including the benchmark comparisons
-pytest -k "not benchmark"   # unit tests only
+uv sync --frozen --all-extras --dev
+pytest
 ruff check .
 mypy src/anchor_align
 ```
 
+The full test run includes the benchmark comparisons and takes a few minutes. `pytest -k "not benchmark"` is the quick pass.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT.
