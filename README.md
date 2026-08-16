@@ -149,3 +149,6 @@ The full test run includes the benchmark comparisons and takes a few minutes. `p
 ## License
 
 MIT.
+---
+
+I build systems like this on contract — [hello@patricf.com](mailto:hello@patricf.com) · [patricf.com](https://patricf.com) · [Upwork](https://www.upwork.com/freelancers/~011c4532b0fb560f78)
